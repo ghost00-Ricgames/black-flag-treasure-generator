@@ -1,0 +1,41 @@
+{
+  "id": "black-flag-treasure-generator",
+  "title": "Black Flag Treasure Generator",
+  "description": "GM-only budgeted encounter, adventure and full-bundle treasure using the licensed Tales of the Valiant GMG RollTables. Foundry v14.",
+  "version": "0.2.0",
+  "url": "https://github.com/ghost00-Ricgames/black-flag-treasure-generator",
+  "manifest": "https://github.com/ghost00-Ricgames/black-flag-treasure-generator/releases/latest/download/module.json",
+  "download": "https://github.com/ghost00-Ricgames/black-flag-treasure-generator/releases/download/v0.2.0/black-flag-treasure-generator.zip",
+  "authors": [
+    {
+      "name": "Foundry Authoring"
+    }
+  ],
+  "compatibility": {
+    "minimum": "14",
+    "maximum": "14"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "black-flag",
+        "type": "system",
+        "compatibility": {
+          "minimum": "3.0.075"
+        }
+      }
+    ],
+    "requires": [
+      {
+        "id": "kp-tov-game-masters-guide",
+        "type": "module"
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "styles": [
+    "styles/treasure.css"
+  ]
+}
