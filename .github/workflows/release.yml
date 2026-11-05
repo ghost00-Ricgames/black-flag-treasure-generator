@@ -1,0 +1,61 @@
+name: Foundry Module Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+
+      - name: Validate version and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          VERSION="$(jq -r '.version' module.json)"
+          if [[ "$TAG" != "v$VERSION" ]]; then
+            echo "Release tag $TAG does not match module version v$VERSION" >&2
+            exit 1
+          fi
+          node --check scripts/main.mjs
+          node --check scripts/bundles.mjs
+          node --check scripts/parcels.mjs
+          node tests/smoke.mjs
+          node tests/full-generator-mock.mjs
+
+      - name: Build installer ZIP and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/module
+          cp module.json dist/module/module.json
+          cp -r scripts styles dist/module/
+          cp module.json dist/module.json
+          (cd dist/module && zip -qr ../black-flag-treasure-generator.zip module.json scripts styles)
+          unzip -p dist/black-flag-treasure-generator.zip module.json | jq -e '.id == "black-flag-treasure-generator"' > /dev/null
+
+      - name: Publish assets to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          ASSETS=(dist/module.json dist/black-flag-treasure-generator.zip)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TAG" --generate-notes --verify-tag
+          fi
