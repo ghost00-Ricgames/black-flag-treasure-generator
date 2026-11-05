@@ -1,0 +1,78 @@
+name: Bootstrap First Treasure Generator Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-first-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: black-flag-treasure-generator-initial-release
+  cancel-in-progress: false
+
+jobs:
+  first-release:
+    if: github.repository == 'ghost00-Ricgames/black-flag-treasure-generator'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v$(jq -r '.version' module.json)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists. No duplicate will be created."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate source and run tests
+        if: steps.release.outputs.exists == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/bundles.mjs
+          node --check scripts/parcels.mjs
+          node --check scripts/main.mjs
+          node tests/smoke.mjs
+          node tests/full-generator-mock.mjs
+
+      - name: Assemble Foundry installer and manifest
+        if: steps.release.outputs.exists == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/module
+          cp module.json dist/module/module.json
+          cp -r scripts styles dist/module/
+          cp module.json dist/module.json
+          (cd dist/module && zip -qr ../black-flag-treasure-generator.zip module.json scripts styles)
+          unzip -p dist/black-flag-treasure-generator.zip module.json |
+            jq -e '.id == "black-flag-treasure-generator" and .version == "0.2.0"' >/dev/null
+          jq -e '.download | endswith("/v0.2.0/black-flag-treasure-generator.zip")' dist/module.json >/dev/null
+
+      - name: Publish release with Foundry manifest and ZIP
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.release.outputs.tag }}" \
+            dist/module.json \
+            dist/black-flag-treasure-generator.zip \
+            --target main \
+            --title "Black Flag Treasure Generator v0.2.0" \
+            --notes "First GitHub-hosted release. Foundry VTT v14 / Black Flag 3.x companion for the official Tales of the Valiant Game Master's Guide. Includes Encounter, Adventure, and Full Bundle treasure modes with persistent private budget allocation. Existing world budgets remain stored locally in Foundry; back up your world before replacing a manual install."
